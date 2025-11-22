@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>A RACING GAME BY FAIZ SIR</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Roboto:wght@400;700&display=swap');
+
+    html,body { margin:0; height:100%; background:#050505; font-family: 'Roboto', sans-serif; overflow:hidden; touch-action:none; user-select:none; }
+    
+    #game-container { position:absolute; inset:0; z-index:1; }
+    
+    #ui-layer { 
+        position:absolute; inset:0; z-index:10; pointer-events:none; 
+        display:flex; flex-direction:column; justify-content:space-between; 
+        padding: 8px;
+    }
+
+    /* HUD Panels */
+    .hud-panel { 
+        pointer-events:auto; 
+        background:rgba(0, 0, 0, 0.8); 
+        border: 1px solid #333;
+        border-radius:10px; 
+        padding: 8px 12px; 
+        color:#fff; 
+        box-shadow: 0 4px 6px rgba(0,0,0,0.5);
+        backdrop-filter: blur(2px);
+    }
+
+    /* Top Row Layout */
+    #top-row { 
+        display:flex; 
+        justify-content:space-between; 
+        align-items:flex-start; 
+        width:100%; 
+        gap: 8px;
+    }
+
+    /* Speedometer */
+    #speed-value { 
+        font-family:'Orbitron',sans-serif; 
+        font-size: 1.8rem; 
+        line-height: 1;
+        color:#00ffcc; 
+        text-shadow: 0 0 8px rgba(0, 255, 204, 0.5); 
+    }
+    .unit-label { font-size: 0.75rem; color: #aaa; font-weight: bold; margin-left: 4px; }
+
+    /* Graph Container */
+    #graph-container { 
+        width: 180px; 
+        height: 110px; 
+        background: #111; 
+        border: 2px solid #444; 
+        border-radius: 6px; 
+        position: relative;
+        box-sizing: border-box;
+    }
+    #graph-canvas { width:100%; height:100%; display:block; }
+
+    /* Controls Area */
+    #controls { 
+        display:flex; 
+        justify-content:space-between; 
+        align-items:flex-end; 
+        padding-bottom: 15px;
+        pointer-events:none; 
+        width: 100%;
+    }
+
+    .control-group { 
+        display:flex; 
+        gap:15px; 
+        pointer-events:auto; 
+    }
+
+    /* Standard Control Button Styling */
+    .control-btn { 
+        width: 75px; 
+        height: 75px; 
+        border-radius:50%; 
+        display:flex; 
+        flex-direction: column;
+        align-items:center; 
+        justify-content:center; 
+        color:#fff; 
+        font-weight: bold;
+        font-family: 'Orbitron', sans-serif;
+        font-size:16px; 
+        touch-action:none; 
+        transition: transform 0.1s, filter 0.1s;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+        border: 3px solid rgba(255,255,255,0.2);
+        backdrop-filter: blur(4px);
+    }
+
+    .control-btn:active { transform: scale(0.95); filter: brightness(1.2); }
+
+    #btn-left, #btn-right {
+        background: rgba(50, 50, 50, 0.8);
+        font-size: 1.8rem;
+    }
+
+    #btn-accel {
+        background: rgba(0, 200, 80, 0.7); /* Bright Green */
+        border-color: #00ff66;
+    }
+    
+    #btn-brake {
+        background: rgba(220, 40, 40, 0.7); /* Bright Red */
+        border-color: #ff4444;
+    }
+
+    .btn-text { font-size: 12px; margin-top: 2px; }
+
+    /* Start Screen */
+    #start-screen { 
+        position:absolute; inset:0; 
+        display:flex; flex-direction: column; 
+        align-items:center; justify-content:center; 
+        z-index:50; 
+        background:rgba(0,0,0,0.92); 
+        backdrop-filter:blur(8px); 
+    }
+    
+    /* Profile Image Styling - UPDATED */
+    #profile-pic {
+        height: 320px;           /* Much bigger height */
+        width: auto;             /* Auto width to maintain aspect ratio */
+        max-width: 90%;          /* Keep inside screen on mobile */
+        border: 4px solid #00ffcc;
+        border-radius: 15px;     /* Rectangle with rounded corners */
+        box-shadow: 0 0 30px rgba(0, 255, 204, 0.5);
+        object-fit: contain;     /* Ensures NO cutting/cropping */
+        margin-bottom: 20px;
+        background-color: #000;  /* Black background for letterbox areas */
+        display: block;
+    }
+    
+    .neon-text { 
+        font-family:'Orbitron',sans-serif; 
+        color:#fff; 
+        text-shadow:0 0 15px #00ffcc; 
+        font-size: 2.0rem;
+        text-align: center;
+        line-height: 1.3;
+    }
+
+    input[type="text"] { 
+        background:#222; 
+        border:2px solid #00ffcc; 
+        color:#fff; 
+        padding:10px 16px; 
+        border-radius:8px; 
+        outline:none; 
+        text-align:center; 
+        font-size: 1.1rem;
+        margin: 20px 0;
+        width: 80%;
+        max-width: 280px;
+    }
+
+    button.start-btn { 
+        background:#00ffcc; 
+        color:#000; 
+        padding:12px 30px; 
+        font-family:'Orbitron',sans-serif; 
+        font-weight:900; 
+        font-size: 1.1rem;
+        border-radius:8px; 
+        cursor:pointer; 
+        border:none; 
+        box-shadow:0 0 20px rgba(0, 255, 204, 0.4); 
+    }
+    
+    button.start-btn:active { transform: scale(0.95); }
+
+    .stats-row { display: flex; gap: 12px; margin-top: 4px; color: #ccc; font-size: 0.8rem; }
+    .stat-item { display: flex; flex-direction: column; }
+    .stat-val { font-weight: bold; color: #fff; }
+
+    @media (min-width: 768px) {
+        #graph-container { width: 280px; height: 160px; }
+        .control-btn { width: 90px; height: 90px; }
+        #speed-value { font-size: 2.2rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="game-container"></div>
+
+  <div id="ui-layer">
+    <!-- Top HUD -->
+    <div id="top-row">
+      <!-- Left Panel: Stats & Speed -->
+      <div class="hud-panel">
+        <div id="player-name-display" class="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Driver</div>
+        <div class="flex items-baseline">
+            <div id="speed-value">0</div>
+            <div class="unit-label">km/h</div>
+        </div>
+        <div class="stats-row">
+            <div class="stat-item"><span class="text-[10px] text-gray-500">SCORE</span><span id="score" class="stat-val">0</span></div>
+            <div class="stat-item"><span class="text-[10px] text-gray-500">LIVES</span><span id="lives" class="stat-val text-red-400">3</span></div>
+        </div>
+      </div>
+
+      <!-- Right Panel: Graph -->
+      <div class="hud-panel flex flex-col items-center">
+        <div class="text-[10px] text-gray-400 mb-1 w-full font-bold">DISTANCE vs TIME</div>
+        <div id="graph-container">
+          <canvas id="graph-canvas"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Controls -->
+    <div id="controls">
+      <!-- Steering -->
+      <div class="control-group">
+        <div id="btn-left" class="control-btn">←</div>
+        <div id="btn-right" class="control-btn">→</div>
+      </div>
+
+      <!-- Pedals -->
+      <div class="control-group">
+        <div id="btn-brake" class="control-btn">
+            <span class="btn-text">BRAKE</span>
+        </div>
+        <div id="btn-accel" class="control-btn">
+            <span class="btn-text">GAS</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Start Screen -->
+  <div id="start-screen">
+    <!-- Image updated: Bigger, Rectangular, No Cropping -->
+    <img id="profile-pic" 
+         src="https://i.ibb.co/tTQN4Z4B/file-000000005170720795f626e5a926ac75.png" 
+         alt="Faiz Sir" 
+         onerror="this.onerror=null; this.src='https://robohash.org/FaizSir.png?set=set1&size=150x150';" />
+
+    <h1 class="neon-text">A RACING GAME<br><span style="font-size: 0.8em; color: #ccc;">BY FAIZ SIR</span></h1>
+    <p class="text-gray-400 mt-4 mb-4 text-sm">Physics Edition</p>
+    
+    <input id="player-name-input" type="text" placeholder="ENTER NAME" maxlength="12" />
+    <button id="start-btn" class="start-btn">START ENGINE</button>
+  </div>
+
+  <script>
+  /* --- GAME CONFIGURATION --- */
+  const CONFIG = {
+      MAX_SPEED: 240,     // Max speed in km/h
+      ACCEL_RATE: 24,     // 10s to reach 240 (240/10 = 24)
+      BRAKE_RATE: 150,    
+      FRICTION: 10,       
+      TURN_SPEED: 8.0,
+      GRAPH_WINDOW: 10
+  };
+
+  const gameState = {
+    isPlaying: false,
+    name: "Driver",
+    speed: 0,
+    distance: 0,
+    time: 0,
+    laneX: 0,
+    score: 0,
+    lives: 3,
+    inputs: { up: false, down: false, left: false, right: false }
+  };
+
+  /* --- THREE.JS SETUP --- */
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x050505);
+  scene.fog = new THREE.FogExp2(0x050505, 0.02);
+
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 500);
+  camera.position.set(0, 2.5, 6);
+  camera.rotation.x = -0.2;
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  document.getElementById('game-container').appendChild(renderer.domElement);
+
+  // Lighting
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambientLight);
+  const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(5, 10, 5);
+  scene.add(dirLight);
+
+  // Road
+  const gridHelper = new THREE.GridHelper(200, 50, 0x00ffcc, 0x222222);
+  scene.add(gridHelper);
+
+  const roadPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(14, 400),
+      new THREE.MeshPhongMaterial({ color: 0x111111 })
+  );
+  roadPlane.rotation.x = -Math.PI / 2;
+  roadPlane.position.y = -0.1;
+  scene.add(roadPlane);
+
+  // Player Car
+  const carGroup = new THREE.Group();
+  const carBody = new THREE.Mesh(
+      new THREE.BoxGeometry(1.6, 0.6, 3.5),
+      new THREE.MeshStandardMaterial({ color: 0xff0044, metalness: 0.7, roughness: 0.2 })
+  );
+  carBody.position.y = 0.3;
+  carGroup.add(carBody);
+  const carTop = new THREE.Mesh(
+      new THREE.BoxGeometry(1.4, 0.5, 1.5),
+      new THREE.MeshStandardMaterial({ color: 0x111111 })
+  );
+  carTop.position.set(0, 0.8, -0.5);
+  carGroup.add(carTop);
+  scene.add(carGroup);
+
+  // Traffic
+  const enemies = [];
+  const enemyColors = [0xffaa00, 0x00aaff, 0xaa00ff, 0xffffff];
+  
+  function spawnEnemy() {
+      const lane = (Math.random() * 10) - 5;
+      const zPos = -100 - (Math.random() * 50);
+      
+      const enemy = new THREE.Mesh(
+          new THREE.BoxGeometry(1.6, 0.6, 3.5),
+          new THREE.MeshStandardMaterial({ color: enemyColors[Math.floor(Math.random()*enemyColors.length)] })
+      );
+      enemy.position.set(lane, 0.3, zPos);
+      scene.add(enemy);
+      enemies.push({ mesh: enemy, speed: 30 + Math.random() * 50 });
+  }
+  
+  for(let i=0; i<5; i++) spawnEnemy();
+
+  /* --- AUDIO SYSTEM --- */
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const engineOsc = audioCtx.createOscillator();
+  const engineGain = audioCtx.createGain();
+  engineOsc.type = 'sawtooth';
+  engineOsc.frequency.value = 100;
+  engineGain.gain.value = 0;
+  engineOsc.connect(engineGain).connect(audioCtx.destination);
+  engineOsc.start();
+
+  function updateAudio() {
+      const ratio = gameState.speed / CONFIG.MAX_SPEED;
+      // Slower pitch ramp up
+      engineOsc.frequency.setTargetAtTime(60 + (ratio * 400), audioCtx.currentTime, 0.1);
+      
+      const vol = gameState.inputs.up ? 0.15 : 0.05;
+      engineGain.gain.setTargetAtTime(vol, audioCtx.currentTime, 0.1);
+  }
+
+  /* --- GRAPH SYSTEM --- */
+  const graphData = [];
+  const canvas = document.getElementById('graph-canvas');
+  const ctx = canvas.getContext('2d');
+
+  function resizeCanvas() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+  }
+  
+  resizeCanvas();
+  window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      resizeCanvas();
+  });
+
+  function drawGraph() {
+      const w = canvas.width;
+      const h = canvas.height;
+      
+      const paddingLeft = 25;
+      const paddingRight = 15; 
+      const paddingBottom = 20;
+      const paddingTop = 10;
+      const graphWidth = w - paddingLeft - paddingRight;
+      const graphHeight = h - paddingBottom - paddingTop;
+
+      // Clear
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, w, h);
+
+      // Grid
+      ctx.strokeStyle = '#333';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for(let i=0; i<=4; i++) {
+          let y = paddingTop + (graphHeight / 4) * i;
+          ctx.moveTo(paddingLeft, y); ctx.lineTo(w - paddingRight, y);
+      }
+      ctx.stroke();
+
+      // Axes
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(paddingLeft, paddingTop); 
+      ctx.lineTo(paddingLeft, h - paddingBottom); 
+      ctx.moveTo(paddingLeft, h - paddingBottom); 
+      ctx.lineTo(w - paddingRight, h - paddingBottom); 
+      ctx.stroke();
+
+      // Labels
+      ctx.fillStyle = '#aaa';
+      ctx.font = '10px sans-serif';
+      ctx.fillText('Dist', 2, 12);
+      ctx.fillText('Time', w - 30, h - 5);
+      ctx.fillText('0', 5, h - paddingBottom);
+
+      // Plot
+      if (graphData.length < 2) return;
+
+      const latestTime = graphData[graphData.length-1].t;
+      const windowStart = Math.max(0, latestTime - CONFIG.GRAPH_WINDOW);
+      
+      let minD = graphData[0].d; 
+      let maxD = graphData[graphData.length-1].d;
+      
+      const visiblePoints = graphData.filter(p => p.t >= windowStart);
+      if (visiblePoints.length > 0) {
+          minD = visiblePoints[0].d;
+          maxD = visiblePoints[visiblePoints.length-1].d;
+      }
+      
+      let distRange = maxD - minD;
+      if(distRange < 10) distRange = 10; 
+
+      ctx.beginPath();
+      ctx.strokeStyle = '#00ffcc'; 
+      ctx.lineWidth = 3;
+      ctx.lineJoin = 'round';
+
+      let firstPoint = true;
+
+      for (let i = 0; i < graphData.length; i++) {
+          const p = graphData[i];
+          if (p.t < windowStart) continue;
+
+          const normX = (p.t - windowStart) / CONFIG.GRAPH_WINDOW;
+          const x = paddingLeft + (normX * graphWidth);
+          const normY = (p.d - minD) / distRange;
+          const y = (h - paddingBottom) - (normY * graphHeight);
+
+          if (firstPoint) {
+              ctx.moveTo(x, y);
+              firstPoint = false;
+          } else {
+              ctx.lineTo(x, y);
+          }
+      }
+      ctx.stroke();
+
+      // Current Dot
+      if (!firstPoint && visiblePoints.length > 0) {
+        const lastP = visiblePoints[visiblePoints.length-1];
+        const normX = (lastP.t - windowStart) / CONFIG.GRAPH_WINDOW;
+        const finalX = paddingLeft + (normX * graphWidth);
+        const normY = (lastP.d - minD) / distRange;
+        const finalY = (h - paddingBottom) - (normY * graphHeight);
+
+        ctx.fillStyle = '#ff0044';
+        ctx.beginPath();
+        ctx.arc(finalX, finalY, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+  }
+
+  /* --- CONTROLS --- */
+  function bindBtn(id, key) {
+      const btn = document.getElementById(id);
+      const set = (v) => gameState.inputs[key] = v;
+      
+      btn.addEventListener('mousedown', (e) => { e.preventDefault(); set(true); });
+      btn.addEventListener('mouseup', (e) => { e.preventDefault(); set(false); });
+      btn.addEventListener('mouseleave', (e) => { e.preventDefault(); set(false); });
+      btn.addEventListener('touchstart', (e) => { e.preventDefault(); set(true); });
+      btn.addEventListener('touchend', (e) => { e.preventDefault(); set(false); });
+  }
+
+  bindBtn('btn-accel', 'up');
+  bindBtn('btn-brake', 'down');
+  bindBtn('btn-left', 'left');
+  bindBtn('btn-right', 'right');
+
+  /* --- MAIN LOOP --- */
+  const clock = new THREE.Clock();
+  
+  function animate() {
+      requestAnimationFrame(animate);
+      
+      if(!gameState.isPlaying) {
+          renderer.render(scene, camera);
+          return;
+      }
+
+      const dt = clock.getDelta();
+      gameState.time += dt;
+
+      // Physics
+      if(gameState.inputs.up) {
+          gameState.speed += CONFIG.ACCEL_RATE * dt;
+      } else if(gameState.inputs.down) {
+          gameState.speed -= CONFIG.BRAKE_RATE * dt;
+      } else {
+          gameState.speed -= CONFIG.FRICTION * dt;
+      }
+
+      gameState.speed = Math.max(0, Math.min(gameState.speed, CONFIG.MAX_SPEED));
+
+      // Move Car Lateral
+      if (gameState.speed > 5) {
+          if(gameState.inputs.left) gameState.laneX -= CONFIG.TURN_SPEED * dt;
+          if(gameState.inputs.right) gameState.laneX += CONFIG.TURN_SPEED * dt;
+          gameState.laneX = Math.max(-6, Math.min(6, gameState.laneX));
+      }
+
+      carGroup.position.x = THREE.MathUtils.lerp(carGroup.position.x, gameState.laneX, 0.1);
+      carGroup.rotation.z = (gameState.laneX - carGroup.position.x) * -0.5;
+
+      // Update Distance
+      const mps = (gameState.speed * 1000) / 3600;
+      const distMoved = mps * dt;
+      gameState.distance += distMoved;
+
+      // Update Graph Data
+      if (Math.floor(gameState.time * 10) > graphData.length) {
+          graphData.push({ t: gameState.time, d: gameState.distance });
+          if(graphData.length > 500) graphData.shift();
+      }
+
+      // Move Road
+      gridHelper.position.z += distMoved;
+      if(gridHelper.position.z > 10) gridHelper.position.z = 0;
+
+      // Move Enemies
+      enemies.forEach(e => {
+          const relSpeed = (mps - (e.speed * 1000 / 3600));
+          e.mesh.position.z += relSpeed * dt;
+
+          if(e.mesh.position.z > 10) {
+              e.mesh.position.z = -200 - (Math.random() * 100);
+              e.mesh.position.x = (Math.random() * 10) - 5;
+              gameState.score += 100;
+          }
+
+          if(Math.abs(e.mesh.position.z - carGroup.position.z) < 2.5 && 
+             Math.abs(e.mesh.position.x - carGroup.position.x) < 1.5) {
+                 gameState.speed *= 0.5;
+                 gameState.lives--;
+                 e.mesh.position.z = 20;
+                 if(gameState.lives <= 0) {
+                     gameState.isPlaying = false;
+                     document.getElementById('start-screen').style.display = 'flex';
+                     document.querySelector('#start-screen h1').innerHTML = "GAME OVER";
+                     document.getElementById('start-btn').innerText = "RESTART";
+                 }
+          }
+      });
+
+      // UI Updates
+      document.getElementById('speed-value').innerText = Math.floor(gameState.speed);
+      document.getElementById('score').innerText = gameState.score;
+      document.getElementById('lives').innerText = gameState.lives;
+
+      updateAudio();
+      drawGraph();
+      renderer.render(scene, camera);
+  }
+
+  document.getElementById('start-btn').addEventListener('click', () => {
+      const name = document.getElementById('player-name-input').value || "Driver";
+      gameState.name = name;
+      gameState.isPlaying = true;
+      gameState.lives = 3;
+      gameState.score = 0;
+      gameState.distance = 0;
+      gameState.time = 0;
+      gameState.speed = 0;
+      graphData.length = 0;
+      
+      document.getElementById('player-name-display').innerText = name;
+      document.getElementById('start-screen').style.display = 'none';
+      
+      if(audioCtx.state === 'suspended') audioCtx.resume();
+  });
+
+  animate();
+
+  </script>
+</body>
+</html>
+
